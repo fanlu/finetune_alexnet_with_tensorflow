@@ -36,6 +36,11 @@ class AlexNet(object):
       self.WEIGHTS_PATH = 'bvlc_alexnet.npy'
     else:
       self.WEIGHTS_PATH = weights_path
+
+    self._lr = tf.Variable(0.0, trainable=False)
+    self._new_lr = tf.placeholder(
+      tf.float32, shape=[], name="new_learning_rate")
+    self._lr_update = tf.assign(self._lr, self._new_lr)
     
     # Call the create function to build the computational graph of AlexNet
     self.create()
@@ -89,7 +94,7 @@ class AlexNet(object):
     
     # Loop over all layer names stored in the weights dict
     for op_name in weights_dict:
-        
+      print("load op_name is ", op_name)
       # Check if the layer is one of the layers that should be reinitialized
       if op_name not in self.SKIP_LAYER:
         
@@ -102,16 +107,28 @@ class AlexNet(object):
             if len(data.shape) == 1:
               
               var = tf.get_variable('biases', trainable = False)
-              session.run(var.assign(data))
+              var.load(data, session)
+              # var.assign(data)
+              # _new_var = tf.placeholder(
+              #   tf.float32, shape=[], name="new_var")
+              # _var_update = tf.assign(var, _new_var)
+              # session.run(_var_update, feed_dict={_new_var: data})
               
             # Weights
             else:
               
               var = tf.get_variable('weights', trainable = False)
-              session.run(var.assign(data))
-            
-     
-  
+              # session.run(var.assign(data))
+              var.load(data, session)
+              # _new_var = tf.placeholder(
+              #   tf.float32, shape=[], name="new_var")
+              # _var_update = tf.assign(var, _new_var)
+              # session.run(_var_update, feed_dict={_new_var: data})
+
+  def assign_lr(self, session, lr_value):
+    session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+
+
 """
 Predefine all necessary layer for the AlexNet
 """ 

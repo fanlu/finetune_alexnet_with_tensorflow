@@ -1,2 +1,7 @@
 *.npy
 **/*.pyc
+.DS_Store
+.idea
+*.tfrecord
+test
+finetune_alexnet
