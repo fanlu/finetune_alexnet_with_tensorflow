@@ -114,13 +114,13 @@ def main(unused_args):
         with tf.device('/job:worker/task:%d' % FLAGS.task_id):
             # Variables and its related init/assign ops are assigned to ps.
             with slim.arg_scope(
-                    [slim.variable, slim.variables.global_step],
+                    [slim.variable],
                     device=tf.contrib.framework.VariableDeviceChooser(num_parameter_servers)):
                 # Only the chief checks for or creates train_dir.
                 if FLAGS.task_id == 0:
                     if not tf.gfile.Exists(FLAGS.train_dir):
                         tf.gfile.MakeDirs(FLAGS.train_dir)
-                filename = "/Users/lonica/Downloads/train.txt"
+                filename = "/export/fanlu/train.txt"
 
                 keep_prob = tf.placeholder(tf.float32)
                 global_step = tf.contrib.framework.get_or_create_global_step()
@@ -184,6 +184,16 @@ def main(unused_args):
                     model.load_initial_weights(sess)
                     print("{} model loaded".format(datetime.now()))
 
+                if is_chief:
+                    local_init_op = optimizer.chief_init_op
+                else:
+                    local_init_op = optimizer.local_step_init_op
+
+                # Initial token and chief queue runners required by the sync_replicas mode
+                if is_chief:
+                    chief_queue_runner = optimizer.get_chief_queue_runner()
+                    sync_init_op = optimizer.get_init_tokens_op()
+
                 print("train start")
                 init_op = tf.global_variables_initializer()
                 sv = tf.train.Supervisor(logdir="finetune_alexnet/supervisor",
@@ -201,12 +211,16 @@ def main(unused_args):
                     log_device_placement=FLAGS.log_device_placement)
                 sess = sv.prepare_or_wait_for_session(server.target, config=sess_config)
 
+                if is_chief:
+                    sess.run(sync_init_op)
+                    sv.start_queue_runners(sess, [chief_queue_runner])
+
                 # Start populating the filename queue.
                 # sess.run(tf.group(tf.global_variables_initializer(), tf.local_variables_initializer()))
                 # model.assign_lr(sess, 0.1)
                 # print("assign lr")
                 # model.load_initial_weights(sess)
-                sv.loop(10, my_additional_summaries, args=(sv, sess))
+                # sv.loop(10, my_additional_summaries, args=(sv, sess))
                 coord = tf.train.Coordinator()
                 threads = tf.train.start_queue_runners(coord=coord, sess=sess)
                 try:
